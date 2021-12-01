@@ -92,5 +92,5 @@ func main() {
 		return nil
 	})
 	panicOnErr(retryErr, fmt.Sprintf("Replication failed for deployment/%s", deployment))
-	fmt.Printf("Replication(%d -> %d) successful\n", oldReplicaCount, newReplicaCount)
+	fmt.Printf("Replication(%d -> %d) of deployment/%s successful\n", oldReplicaCount, newReplicaCount, deployment)
 }
