@@ -1,15 +1,13 @@
 package main
 
 import (
-	"context"
 	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
 
 	prclient "github.com/var23rav/pod_replicator/client"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
+	k8sresource "github.com/var23rav/pod_replicator/k8s_resource"
 )
 
 func panicOnErr(err error, msg string) {
@@ -45,11 +43,24 @@ func main() {
 	var destnamespace string
 	flag.StringVar(&destnamespace, "destnamespace", "default", "Enter the source namespace")
 
-	var deployment string
-	flag.StringVar(&deployment, "deployment", "vote", "Enter the deploymentset")
-	if deployment == "" {
-		panicOnErr(fmt.Errorf("%s, current %s", "set --deployment flag to duplicate", deployment), "No Deployment flag")
+	var resourceType string
+	flag.StringVar(&resourceType, "kind", "Deployment", "Enter the K8s ResourceType")
+	if resourceType == "" {
+		requiredErr := fmt.Errorf("%s, current %s", "set --kind flag to identify the targeted resource type", resourceType)
+		fmt.Println(requiredErr)
+		panicOnErr(requiredErr, "No ResourceType flag")
 	}
+
+	var resourceName string
+	flag.StringVar(&resourceName, "name", "default", "Enter the Resource name")
+	if resourceName == "" {
+		requiredErr := fmt.Errorf("%s, current %s", "set --name flag to identify the targeted resource", resourceName)
+		fmt.Println(requiredErr)
+		panicOnErr(requiredErr, "No ResourceName flag")
+	}
+
+	var enableForceOverride bool
+	flag.BoolVar(&enableForceOverride, "force", false, "Do a force override")
 
 	flag.Parse()
 
@@ -58,39 +69,20 @@ func main() {
 	replicator.SetTargetCluster(*destConfigPath)
 	replicator.SetSourceNamespace(srcnamespace)
 	replicator.SetTargetNamespace(destnamespace)
-	replicator.SetDeploymentName(deployment)
+	replicator.SetResourceType(resourceType)
+	replicator.SetResourceName(resourceName)
 	replicaClient, err := replicator.Build()
 	panicOnErr(err, "Replication client creation failed")
 
-	srcNSDeployment := replicaClient.SrcClientSet.AppsV1().Deployments(srcnamespace)
-	destNSDeployment := replicaClient.DestClientSet.AppsV1().Deployments(destnamespace)
+	resourceObj := k8sresource.ResourceType(resourceType)
+	resourceMigrator, err := resourceObj.Build(replicaClient)
+	panicOnErr(err, "Building Resource Object failed")
 
-	// Initial try
-	_, err = srcNSDeployment.Get(context.Background(), deployment, metav1.GetOptions{})
-	panicOnErr(err, fmt.Sprintf("While reading deployment/%s DeploymentSet from source cluster", deployment))
-	var newReplicaCount, oldReplicaCount int32
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	err = resourceMigrator.Migrate(enableForceOverride)
+	panicOnErr(err, fmt.Sprintf("Resource migration failed for %s", resourceMigrator.Name()))
+	if err != nil {
+		fmt.Printf("Resource migration failed for %s, %+v\n", resourceMigrator.Name(), err)
+	}
 
-		srcDeployment, err := srcNSDeployment.Get(context.Background(), deployment, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("%s While reading deployment/%s from source cluster", err, deployment)
-		}
-
-		destDeployment, err := destNSDeployment.Get(context.Background(), deployment, metav1.GetOptions{})
-		if err != nil {
-			return fmt.Errorf("%s While reading deployment/%s from destination cluster", err, deployment)
-		}
-
-		newReplicaCount = *srcDeployment.Spec.Replicas
-		oldReplicaCount = *destDeployment.Spec.Replicas
-		destDeployment.Spec.Replicas = &newReplicaCount
-		_, err = destNSDeployment.Update(context.Background(), destDeployment, metav1.UpdateOptions{})
-		if err != nil {
-			return fmt.Errorf("%s While updating replica count update %d->%d %s Deploy", err, oldReplicaCount, newReplicaCount, deployment)
-		}
-
-		return nil
-	})
-	panicOnErr(retryErr, fmt.Sprintf("Replication failed for deployment/%s", deployment))
-	fmt.Printf("Replication(%d -> %d) of deployment/%s successful\n", oldReplicaCount, newReplicaCount, deployment)
+	fmt.Println("Resource migration completed successfully")
 }

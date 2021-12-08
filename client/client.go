@@ -2,6 +2,7 @@ package client
 
 import (
 	"fmt"
+	"strings"
 
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
@@ -12,13 +13,14 @@ type replicatorClient struct {
 	targetConfigPath string
 	srcNamespace     string
 	targetNamespace  string
-	deploymentName   string
+	resourceType     string
+	resourceName     string
 }
 
 type ReplicationClient struct {
-	Client        *replicatorClient
-	SrcClientSet  *kubernetes.Clientset
-	DestClientSet *kubernetes.Clientset
+	*replicatorClient
+	srcClientSet    *kubernetes.Clientset
+	targetClientSet *kubernetes.Clientset
 }
 
 func New() *replicatorClient {
@@ -26,23 +28,27 @@ func New() *replicatorClient {
 }
 
 func (replicator *replicatorClient) SetSourceCluster(configPath string) {
-	replicator.srcConfigPath = configPath
+	replicator.srcConfigPath = strings.Trim(configPath, " ")
 }
 
 func (replicator *replicatorClient) SetTargetCluster(configPath string) {
-	replicator.targetConfigPath = configPath
+	replicator.targetConfigPath = strings.Trim(configPath, " ")
 }
 
 func (replicator *replicatorClient) SetSourceNamespace(ns string) {
-	replicator.srcNamespace = ns
+	replicator.srcNamespace = strings.Trim(ns, " ")
 }
 
 func (replicator *replicatorClient) SetTargetNamespace(ns string) {
-	replicator.targetNamespace = ns
+	replicator.targetNamespace = strings.Trim(ns, " ")
 }
 
-func (replicator *replicatorClient) SetDeploymentName(deploymentName string) {
-	replicator.deploymentName = deploymentName
+func (replicator *replicatorClient) SetResourceType(resourceType string) {
+	replicator.resourceType = strings.Trim(resourceType, " ")
+}
+
+func (replicator *replicatorClient) SetResourceName(resourceName string) {
+	replicator.resourceName = strings.Trim(resourceName, " ")
 }
 
 func (builder *replicatorClient) Build() (*ReplicationClient, error) {
@@ -71,8 +77,40 @@ func (builder *replicatorClient) Build() (*ReplicationClient, error) {
 	}
 
 	return &ReplicationClient{
-		Client:        builder,
-		SrcClientSet:  srcClientSet,
-		DestClientSet: destClientSet,
+		replicatorClient: builder,
+		srcClientSet:     srcClientSet,
+		targetClientSet:  destClientSet,
 	}, nil
+}
+
+func (replicationClient ReplicationClient) GetSrcClientSet() *kubernetes.Clientset {
+	return replicationClient.srcClientSet
+}
+
+func (replicationClient ReplicationClient) GetTargetClientSet() *kubernetes.Clientset {
+	return replicationClient.targetClientSet
+}
+
+func (replicationClient ReplicationClient) GetSrcNamespace() string {
+	if replicationClient.srcNamespace == "" {
+		return replicationClient.targetNamespace
+	}
+
+	return replicationClient.srcNamespace
+}
+
+func (replicationClient ReplicationClient) GetTargetNamespace() string {
+	if replicationClient.targetNamespace == "" {
+		return replicationClient.srcNamespace
+	}
+
+	return replicationClient.targetNamespace
+}
+
+func (replicationClient ReplicationClient) GetResourceType() string {
+	return replicationClient.resourceType
+}
+
+func (replicationClient ReplicationClient) GetResourceName() string {
+	return replicationClient.resourceName
 }
