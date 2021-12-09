@@ -20,6 +20,8 @@ func (resourceType ResourceType) String() string {
 
 func (resourceType ResourceType) Build(replicationClient *prclient.ReplicationClient) (Resource, error) {
 	switch resourceType.String() {
+	case "mock_resource":
+		return MockResource{replicationClient}, nil
 	case "deployment":
 		return Deployment{replicationClient}, nil
 	default:

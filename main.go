@@ -60,7 +60,7 @@ func main() {
 	}
 
 	var enableForceOverride bool
-	flag.BoolVar(&enableForceOverride, "force", false, "Do a force override")
+	flag.BoolVar(&enableForceOverride, "force", false, "Force override; Create in case missing replace when existing.")
 
 	flag.Parse()
 

@@ -2,37 +2,46 @@
 
 * Support across cluster
 * Support across namespace
+* Support migration of Resources(currently deployment supported)
 
 ## Prerequisites
 
-* Cluster is supposed to define with proper k8s resources like Namespaces and Deployment
+* Cluster is supposed to define with proper k8s resources like Namespaces
 * Keep source and destination config file in handy
 
 ## Usage
 
 ```md
-Usage of pod_replicator:
+Usage of ./pod_replicator:
   -debug
         Enable debug logs
-  -deployment string
-        Enter the deploymentset (default "vote")
   -destconfig string
-        Enter the destination config file path (default "$pwd\.kubeconfig")
+        Enter the destination config file path (default "$pwd/.kubeconfig")
   -destnamespace string
         Enter the source namespace (default "default")
+  -force
+        Force override; Create in case missing replace when existing
+  -kind string
+        Enter the K8s ResourceType (default "Deployment")
+  -name string
+        Enter the Resource name (default "default")
   -srcconfig string
-        Enter the source config file path (default "$pwd\.kubeconfig")
+        Enter the source config file path (default "$pwd/.kubeconfig")
   -srcnamespace string
         Enter the source namespace (default "default")
 ```
 
-`Replication within same cluster. Keep the cluster k8s config file in same folder`
+`Replication within same cluster for existing resource. Keep the cluster k8s config file in same folder`
 
-> pod_replicator_executable  --srcnamespace vote  --destnamespace default  --deployment vote --debug
+> pod_replicator_executable  --srcnamespace vote  --destnamespace default  --name vote --debug
+
+`Replication within same cluster for overriding existing or create new resources. Keep the cluster k8s config file in same folder`
+
+> pod_replicator_executable  --srcnamespace vote  --destnamespace default  --name vote --debug --force
 
 `Replication across cluster. Keep the cluster k8s config file in same folder`
 
-> pod_replicator_executable  --srcconfig src_k8s_config --destconfig dest_k8s_config --srcnamespace source_namespace --destnamespace dest_namespace --deployment test_deployment --debug
+> pod_replicator_executable  --srcconfig src_k8s_config --destconfig dest_k8s_config --srcnamespace source_namespace --destnamespace dest_namespace --kind deployment --name test_deployment --debug
 
 ## Docker Usage
 
@@ -43,7 +52,10 @@ docker run                                            \
       --rm -it <image_name:tag>                       \
       --srcnamespace <source namespace>               \
       --destnamespace <destination namespace>         \
-      --deployment <deployment name>
+      --kind <resource type>                          \
+      --name <resource name>                          \
+      -- force                                        \
+      -- debug
 
 > Replication across cluster.
 docker run                                                        \
@@ -54,6 +66,14 @@ docker run                                                        \
       --destconfig /dest_k8s_config                               \
       --srcnamespace <source namespace>                           \
       --destnamespace <destination namespace>                     \
-      --deployment <deployment name>
+      --name <resource name>
 ```
 
+## Attention Developers (PRs expected)
+
+`Sample resource file created to help the onboarding. Try mock resource migration`
+
+* Update the supported resources under [ResourceType.Build()](./k8s_resource/k8s_resource.go)
+* Write the migration logic for the same [k8s_resource/mock_resource.go](./k8s_resource/mock_resource.go)
+
+> pod_replicator_executable --srcnamespace source --destnamespace  target --kind mock_resource --name test --debug
